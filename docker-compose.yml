@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  hng-db:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: hng
+      POSTGRES_USER: gray
+      POSTGRES_PASSWORD: wahala
+    ports:
+      - "4000:5432"  # Expose PostgreSQL port
