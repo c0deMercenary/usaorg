@@ -22,6 +22,12 @@ model User {
   phone String?
   userOrganizations UserOrganization[]
 }
+model Organization {
+  orgId String @id @default(cuid()) @unique
+  name String
+  description String?
+  userOrganizations UserOrganization[]
+}
 
 model UserOrganization {
   id Int @id @default(autoincrement())
@@ -29,10 +35,4 @@ model UserOrganization {
   org_id String
   User User @relation(fields: [user_id], references: [userId])
   Organization Organization @relation(fields: [org_id], references: [orgId])
-}
-model Organization {
-  orgId String @id @default(cuid()) @unique
-  name String
-  description String?
-  userOrganizations UserOrganization[]
 }

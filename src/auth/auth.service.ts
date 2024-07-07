@@ -4,9 +4,10 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { LoginAuthDto, RegisterAuthDto } from './dto';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import * as argon2 from 'argon2';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { JwtService } from '@nestjs/jwt';
@@ -65,7 +66,13 @@ export class AuthService {
     } catch (err) {
       if (err instanceof PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
-          return new ForbiddenException('Duplicate value');
+          throw new HttpException(
+            {
+              message: 'Duplicate email',
+              status: HttpStatus.UNPROCESSABLE_ENTITY,
+            },
+            HttpStatus.UNPROCESSABLE_ENTITY,
+          );
         }
       }
       throw new HttpException(
@@ -144,5 +151,18 @@ export class AuthService {
     return {
       access_token: token,
     };
+  }
+
+  async validateUser(payload: { email: string; sub: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { userId: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    delete user.password;
+    return user;
   }
 }

@@ -1,8 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
+import { OrganizationModule } from './organization/organization.module';
+
+@Global()
 @Module({
   imports: [
     PrismaModule,
@@ -11,6 +14,7 @@ import { AuthModule } from './auth/auth.module';
     }),
     UserModule,
     AuthModule,
+    OrganizationModule,
   ],
   exports: [PrismaModule],
 })
