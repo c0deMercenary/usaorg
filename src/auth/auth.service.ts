@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpCode,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { LoginAuthDto, RegisterAuthDto } from './dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as argon2 from 'argon2';
@@ -14,9 +20,7 @@ export class AuthService {
     private config: ConfigService,
   ) {}
   async signup(dto: RegisterAuthDto) {
-
     const hashPassword = await argon2.hash(dto.password);
-
     try {
       const user = await this.prisma.user.create({
         data: {
@@ -28,30 +32,98 @@ export class AuthService {
         },
       });
 
-      return this.signToken(user.userId, user.email);
+      const organization = await this.prisma.organization.create({
+        data: {
+          name: dto.firstname + "'s " + 'organization',
+          description: '',
+        },
+      });
+
+      await this.prisma.userOrganization.create({
+        data: {
+          user_id: user.userId,
+          org_id: organization.orgId,
+        },
+      });
+
+      const access_token = await this.signToken(user.userId, user.email);
+
+      return {
+        status: 'success',
+        message: 'Registration successful',
+        data: {
+          accessToken: access_token?.access_token,
+          user: {
+            userId: user.userId,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+          },
+        },
+      };
     } catch (err) {
       if (err instanceof PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
           return new ForbiddenException('Duplicate value');
         }
       }
-      throw err;
+      throw new HttpException(
+        {
+          status: 'Bad request',
+          message: 'Registration unsuccessful',
+          statusCode: HttpStatus.BAD_REQUEST,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
+  @HttpCode(HttpStatus.OK)
   async login(dto: LoginAuthDto) {
-    const userExist = await this.prisma.user.findUnique({
-      where: {
-        email: dto.email,
-      },
-    });
+    try {
+      const userExist = await this.prisma.user.findUnique({
+        where: {
+          email: dto.email,
+        },
+      });
 
-    if (!userExist) throw new ForbiddenException('Invalid credential');
+      if (!userExist) throw new ForbiddenException('Invalid credential');
 
-    const passwordMatch = await argon2.verify(userExist.password, dto.password);
+      const passwordMatch = await argon2.verify(
+        userExist.password,
+        dto.password,
+      );
 
-    if (!passwordMatch) throw new ForbiddenException('Password not correct');
+      if (!passwordMatch) throw new ForbiddenException('Password not correct');
 
-    return this.signToken(userExist.userId, userExist.email);
+      const access_token = await this.signToken(
+        userExist.userId,
+        userExist.email,
+      );
+      return {
+        status: 'success',
+        message: 'Login successful',
+        data: {
+          accessToken: access_token?.access_token,
+          user: {
+            userId: userExist.userId,
+            firstName: userExist.firstName,
+            lastName: userExist.lastName,
+            email: userExist.email,
+            phone: userExist.phone,
+          },
+        },
+      };
+    } catch (err) {
+      throw new HttpException(
+        {
+          status: 'Bad request',
+          message: 'Authentication failed',
+          statusCode: HttpStatus.UNAUTHORIZED,
+        },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
   }
 
   async signToken(
